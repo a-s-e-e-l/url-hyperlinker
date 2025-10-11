@@ -7,7 +7,7 @@ import TabNavigation from '@/popup/components/tab-navigation'
 import { defaultSettings, type Settings } from '@/types/settings'
 import { cn } from '@/utils/helper'
 import { getSettings, saveSettings } from '@/utils/storage'
-import { Link, Loader2, RefreshCw } from 'lucide-react'
+import { Link, Loader2, RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 type Tab = 'settings' | 'sites' | 'about'
@@ -25,6 +25,8 @@ function Popup() {
   const [showNoUpdateNotification, setShowNoUpdateNotification] =
     useState(false)
   const [buttonTitle, setButtonTitle] = useState('Check for updates')
+  const [dismissingReload, setDismissingReload] = useState(false)
+  const [dismissingNoUpdate, setDismissingNoUpdate] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -46,6 +48,18 @@ function Popup() {
       return () => clearInterval(interval)
     }
   }, [cooldownEndTime])
+
+  useEffect(() => {
+    if (showReloadNotification) {
+      setDismissingReload(false)
+    }
+  }, [showReloadNotification])
+
+  useEffect(() => {
+    if (showNoUpdateNotification) {
+      setDismissingNoUpdate(false)
+    }
+  }, [showNoUpdateNotification])
 
   const loadSettings = async () => {
     const loaded = await getSettings()
@@ -70,7 +84,10 @@ function Popup() {
     setCooldownEndTime(Date.now() + 60000)
     if (!updateAvailable) {
       setShowNoUpdateNotification(true)
-      setTimeout(() => setShowNoUpdateNotification(false), 5000)
+      setTimeout(() => {
+        setDismissingNoUpdate(true)
+        setTimeout(() => setShowNoUpdateNotification(false), 300)
+      }, 5000)
     }
   }
 
@@ -86,7 +103,7 @@ function Popup() {
   }
 
   return (
-    <div className="w-[480px] h-[600px] bg-[#1a1a1f] text-gray-200 flex flex-col">
+    <div className="w-[480px] h-[600px] bg-[#1a1a1f] text-gray-200 flex flex-col relative overflow-hidden">
       {/* Header */}
       <Card className="border-b border-gray-800 rounded-none bg-[#0f0f12] px-6 py-4">
         <div className="flex items-center justify-between">
@@ -151,49 +168,99 @@ function Popup() {
         </div>
       </div>
 
-      {/* Update Notification */}
-      {updateAvailable && (
-        <div className="bg-blue-600 text-white p-3 text-center text-sm flex items-center justify-center gap-2">
-          <span>New version {latestVersion} available!</span>
-          <button
-            onClick={() => {
-              chrome.tabs.create({ url: releaseUrl })
-            }}
-            className="underline hover:no-underline"
-          >
-            View Release
-          </button>
+      <div
+        aria-hidden={
+          !updateAvailable &&
+          !showNoUpdateNotification &&
+          !showReloadNotification
+        }
+        className={cn(
+          'absolute left-4 right-4 bottom-4 flex items-end justify-center pointer-events-none',
+          'transform-gpu'
+        )}
+      >
+        {/* Update available */}
+        <div
+          className={cn(
+            'w-fit rounded-md text-sm shadow-lg transition-all duration-300 ease-out',
+            updateAvailable
+              ? 'translate-y-0 opacity-100 pointer-events-auto'
+              : 'translate-y-6 opacity-0 pointer-events-none'
+          )}
+        >
+          {updateAvailable && (
+            <div className="bg-blue-600 text-white p-3 text-center flex items-center justify-center gap-2 rounded-md">
+              <span>New version {latestVersion} available!</span>
+              <button
+                onClick={() => {
+                  chrome.tabs.create({ url: releaseUrl })
+                }}
+                className="underline hover:no-underline"
+              >
+                View Release
+              </button>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* No Update Notification */}
-      {showNoUpdateNotification && (
-        <div className="bg-green-600 text-white p-3 text-center text-sm">
-          <span>You are up to date!</span>
+        {/* No update (success) */}
+        <div
+          className={cn(
+            'w-fit rounded-md text-sm shadow-lg transition-all duration-300 ease-out mt-2',
+            showNoUpdateNotification && !dismissingNoUpdate
+              ? 'translate-y-0 opacity-100 pointer-events-auto'
+              : 'translate-y-12 opacity-0 pointer-events-none'
+          )}
+        >
+          {showNoUpdateNotification && (
+            <div className="bg-green-600 text-white p-3 text-center rounded-md">
+              <span>You are up to date!</span>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Reload Notification */}
-      {showReloadNotification && (
-        <div className="bg-yellow-600 text-white p-3 text-center text-sm flex items-center justify-center gap-2">
-          <span>Page reload required for changes to take effect.</span>
-          <button
-            onClick={async () => {
-              const [tab] = await chrome.tabs.query({
-                active: true,
-                currentWindow: true
-              })
-              if (tab.id) {
-                chrome.tabs.reload(tab.id)
-              }
-              setShowReloadNotification(false)
-            }}
-            className="underline hover:no-underline"
-          >
-            Reload Page
-          </button>
+        {/* Reload notification */}
+        <div
+          className={cn(
+            'w-fit rounded-md text-sm shadow-lg transition-all duration-300 ease-out mt-2',
+            showReloadNotification && !dismissingReload
+              ? 'translate-y-0 opacity-100 pointer-events-auto'
+              : 'translate-y-12 opacity-0 pointer-events-none'
+          )}
+        >
+          {showReloadNotification && (
+            <div className="bg-yellow-600 text-white p-3 rounded-md relative flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>Page reload required for changes to take effect.</span>
+                <button
+                  onClick={async () => {
+                    const [tab] = await chrome.tabs.query({
+                      active: true,
+                      currentWindow: true
+                    })
+                    if (tab.id) {
+                      chrome.tabs.reload(tab.id)
+                    }
+                    setShowReloadNotification(false)
+                  }}
+                  className="underline hover:no-underline"
+                >
+                  Reload Page
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  setDismissingReload(true)
+                  setTimeout(() => setShowReloadNotification(false), 300)
+                }}
+                className="text-white hover:text-gray-200 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
