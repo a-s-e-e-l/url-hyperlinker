@@ -49,12 +49,13 @@ jobs:
               shell: bash
               run: |
                   echo "${{ secrets.PRIVATE_KEY_BASE64 }}" | base64 -d > private.pem
+                  chmod 600 private.pem
 
             - name: Install crx3
               run: npm i -g crx3
 
             - name: Pack CRX with stable key
-              run: crx3 dist --private-key private.pem -o url-hyperlinker.crx
+              run: crx3 dist --key private.pem -o url-hyperlinker.crx
 
             - name: Create GitHub Release (auto-creates tag if missing)
               uses: softprops/action-gh-release@v2
