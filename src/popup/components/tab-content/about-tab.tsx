@@ -1,8 +1,17 @@
 import Card from '@/popup/components/card'
 import FeatureList from '@/popup/components/feature-list'
 import Section from '@/popup/components/section'
+import { useEffect, useState } from 'react'
 
 function AboutTab() {
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    // get manifest data from chrome API
+    const manifest = chrome.runtime.getManifest()
+    setVersion(manifest.version)
+  }, [])
+
   const features = [
     { text: 'Automatically detects URLs and domains in plain text' },
     { text: 'Activate on all sites or only specific domains' },
@@ -32,7 +41,9 @@ function AboutTab() {
       <Card>
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Version</span>
-          <span className="text-white font-medium">1.0.0</span>
+          <span className="text-white font-medium">
+            {version || 'Loading...'}
+          </span>
         </div>
       </Card>
     </div>
